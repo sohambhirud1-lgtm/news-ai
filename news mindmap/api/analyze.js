@@ -16,9 +16,23 @@ app.post('/api/analyze', async (req, res) => {
     const { data: html } = await axios.get(url);
     const $ = cheerio.load(html);
     let text = '';
-    $('p').each((_, el) => {
-      text += $(el).text() + '\n';
+    // Try to extract articleBody from application/ld+json
+    let foundJson = false;
+    $('script[type="application/ld+json"]').each((_, el) => {
+      try {
+        const json = JSON.parse($(el).html());
+        if (json.articleBody) {
+          text = json.articleBody;
+          foundJson = true;
+        }
+      } catch (e) {}
     });
+    // Fallback to <p> tags if no articleBody found
+    if (!foundJson) {
+      $('p').each((_, el) => {
+        text += $(el).text() + '\n';
+      });
+    }
 
     // Send to OpenRouter API
     const openrouterRes = await axios.post(
